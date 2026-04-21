@@ -2,54 +2,63 @@ import streamlit as st
 import numpy as np
 import pickle
 import re
-from keras.models import load_model
-from keras.preprocessing.sequence import pad_sequences
+import onnxruntime as ort
 
-# Load model
-model = load_model("sentiment_lstm_model.h5")
+# Load ONNX model
+session = ort.InferenceSession("model.onnx")
+
+# Get input/output names
+input_name = session.get_inputs()[0].name
+output_name = session.get_outputs()[0].name
 
 # Load tokenizer
 with open("tokenizer.pkl", "rb") as f:
     tokenizer = pickle.load(f)
 
-# Max length (same as training)
-MAX_LEN = 100
+MAX_LEN = 100  # must match training
 
-
-# Text cleaning (basic for Twitter)
+# Clean text (Twitter style)
 def clean_text(text):
     text = text.lower()
-    text = re.sub(r"http\S+", "", text)  # remove links
-    text = re.sub(r"@\w+", "", text)  # remove mentions
-    text = re.sub(r"#\w+", "", text)  # remove hashtags
+    text = re.sub(r"http\S+", "", text)
+    text = re.sub(r"@\w+", "", text)
+    text = re.sub(r"#\w+", "", text)
     text = re.sub(r"[^a-zA-Z\s]", "", text)
     return text
 
+# Pad manually (no tensorflow needed)
+def pad_sequence(seq, maxlen):
+    padded = np.zeros((1, maxlen))
+    seq = seq[:maxlen]
+    padded[0, -len(seq):] = seq
+    return padded.astype(np.int32)
 
-# Predict function
-def predict_sentiment(text):
+# Prediction
+def predict(text):
     text = clean_text(text)
-    seq = tokenizer.texts_to_sequences([text])
-    padded = pad_sequences(seq, maxlen=MAX_LEN)
+    seq = tokenizer.texts_to_sequences([text])[0]
+    padded = pad_sequence(seq, MAX_LEN)
 
-    pred = model.predict(padded)[0][0]
+    pred = session.run([output_name], {input_name: padded})[0][0][0]
 
     if pred > 0.6:
-        return "Positive 😊"
+        sentiment = "Positive 😊"
     elif pred < 0.4:
-        return "Negative 😡"
+        sentiment = "Negative 😡"
     else:
-        return "Neutral 😐"
+        sentiment = "Neutral 😐"
 
+    return sentiment, float(pred)
 
-# Streamlit UI
-st.title("🐦 Twitter Sentiment Analysis (LSTM)")
+# UI
+st.title("🐦 Twitter Sentiment Analysis (ONNX)")
 
-user_input = st.text_area("Enter Tweet")
+text = st.text_area("Enter tweet")
 
 if st.button("Analyze"):
-    if user_input.strip() == "":
-        st.warning("Please enter a tweet")
+    if text.strip():
+        sentiment, score = predict(text)
+        st.success(f"Sentiment: {sentiment}")
+        st.write(f"Confidence: {score:.2f}")
     else:
-        result = predict_sentiment(user_input)
-        st.success(f"Sentiment: {result}")
+        st.warning("Please enter text")
