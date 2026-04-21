@@ -2,8 +2,8 @@ import streamlit as st
 import numpy as np
 import pickle
 import re
-from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing.sequence import pad_sequences
+from keras.models import load_model
+from keras.preprocessing.sequence import pad_sequences
 
 # Load model
 model = load_model("sentiment_lstm_model.h5")
@@ -15,14 +15,16 @@ with open("tokenizer.pkl", "rb") as f:
 # Max length (same as training)
 MAX_LEN = 100
 
+
 # Text cleaning (basic for Twitter)
 def clean_text(text):
     text = text.lower()
-    text = re.sub(r"http\S+", "", text)   # remove links
-    text = re.sub(r"@\w+", "", text)      # remove mentions
-    text = re.sub(r"#\w+", "", text)      # remove hashtags
+    text = re.sub(r"http\S+", "", text)  # remove links
+    text = re.sub(r"@\w+", "", text)  # remove mentions
+    text = re.sub(r"#\w+", "", text)  # remove hashtags
     text = re.sub(r"[^a-zA-Z\s]", "", text)
     return text
+
 
 # Predict function
 def predict_sentiment(text):
@@ -38,6 +40,7 @@ def predict_sentiment(text):
         return "Negative 😡"
     else:
         return "Neutral 😐"
+
 
 # Streamlit UI
 st.title("🐦 Twitter Sentiment Analysis (LSTM)")
